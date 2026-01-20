@@ -1,21 +1,19 @@
 def validate_name(name):
-    """Check if name is valid"""
-    if not name:
-        return "Please enter your name"
-    if not name.strip():
-        return "Name cannot be empty spaces"
+    """Validate name - only letters and spaces allowed"""
     
-    # Check if name contains at least one letter
-    has_letter = False
-    for char in name:
-        if char.isalpha(): 
-            has_letter = True
-            break
+    # Check if empty
+    if not name or name.strip() == "":
+        return "Name is required"
     
-    if not has_letter:
-        return "Name must contain at least one letter (not just numbers)"
+    # Check if name contains only letters and spaces
+    if not all(char.isalpha() or char.isspace() for char in name):
+        return "Name should contain only letters"
     
-    return None  
+    # Check minimum length
+    if len(name.strip()) < 2:
+        return "Name must be at least 2 characters"
+    
+    return None
 
 
 def validate_email(email):

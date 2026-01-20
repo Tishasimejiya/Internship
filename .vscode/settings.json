@@ -1,0 +1,3 @@
+{
+  "python.analysis.extraPaths": ["./Streamlit_app/Frontend"]
+}

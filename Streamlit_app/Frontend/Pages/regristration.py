@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 def render_regristration():
     st.title("User Registration")
-    
+
     # --- Full Name Field ---
     Username = st.text_input("Full Name", placeholder="Enter your full name")
     
@@ -18,7 +18,7 @@ def render_regristration():
     
     # --- Email Field ---
     Email = st.text_input("Email", placeholder="Enter your email address")
-    
+
     # Real-time validation
     if Email:
         email_error = validate_email(Email)
@@ -26,7 +26,7 @@ def render_regristration():
             st.error(f"❌ {email_error}")
         else:
             st.success("✅ Email looks good")
-    
+
     # --- Password Field ---
     Password = st.text_input("Password", type="password", placeholder="Enter your password")
     
