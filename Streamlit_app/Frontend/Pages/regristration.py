@@ -1,6 +1,6 @@
 import streamlit as st
 from utils.validation import validate_name, validate_email, validate_password, validate_confirm_password
-from datetime import datetime
+from datetime import date, datetime
 
 def render_regristration():
     st.title("User Registration")
@@ -76,7 +76,7 @@ def render_regristration():
             st.session_state.user_data = {
                 "name": Username,
                 "email": Email,
-                "registration_date": datetime.now().strftime("%B %d, %Y at %I:%M %p")
+                "registration_date": date.today().strftime("%B %d, %Y")
             }
             
             # Navigate to dashboard
