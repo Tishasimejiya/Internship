@@ -83,6 +83,16 @@ echo Deployed: http://localhost:8501
 echo.
 echo ========================================
 echo.
+
+REM Open browser
 echo Opening app in browser in 3 seconds...
 timeout /t 3 /nobreak > nul
 start http://localhost:8501
+
+REM Show logs automatically
+echo.
+echo ========================================
+echo   LIVE LOGS (Press Ctrl+C to exit)
+echo ========================================
+echo.
+docker logs -f registration-app
