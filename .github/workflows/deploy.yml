@@ -1,14 +1,17 @@
-name: Deploy to Production
+name: Deploy Multi-Instance (Different Images)
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'Streamlit_app/**'
+      - '.github/workflows/deploy.yml'
 
 jobs:
-  deploy:
+  # Instance 1 - Port 8501
+  deploy-instance-1:
     runs-on: self-hosted
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -18,34 +21,167 @@ jobs:
         run: |
           python3 tests/test_validation.py
       
-      - name: Build Docker image
+      - name: Build Docker image for Instance 1
         working-directory: ./Streamlit_app
         run: |
-          docker build -t registration-app:latest .
+          echo "🔨 Building image: registration-app:instance-1"
+          docker build -t registration-app:instance-1 .
       
-      - name: Stop old container
+      - name: Deploy Instance 1 container
         run: |
-          docker stop registration-app || true
-          docker rm registration-app || true
-      
-      - name: Start new container
-        run: |
+          docker stop registration-instance-1 || true
+          docker rm registration-instance-1 || true
           docker run -d \
             -p 8501:8501 \
-            --name registration-app \
+            --name registration-instance-1 \
             --restart unless-stopped \
-            registration-app:latest
+            registration-app:instance-1
       
-      - name: Wait for container to start
+      - name: Health check Instance 1
         run: |
           sleep 5
-          docker ps | grep registration-app
-      
-      - name: Health check
-        run: |
           curl -f http://localhost:8501 || exit 1
+          echo "✅ Instance 1 deployed on port 8501"
+
+  # Instance 2 - Port 8502
+  deploy-instance-2:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
       
-      - name: Deployment successful
+      - name: Build Docker image for Instance 2
+        working-directory: ./Streamlit_app
         run: |
-          echo "✅ Deployment completed successfully!"
-          echo "🌐 App is live at http://207.180.253.183:8501"
+          echo "🔨 Building image: registration-app:instance-2"
+          docker build -t registration-app:instance-2 .
+      
+      - name: Deploy Instance 2 container
+        run: |
+          docker stop registration-instance-2 || true
+          docker rm registration-instance-2 || true
+          docker run -d \
+            -p 8502:8501 \
+            --name registration-instance-2 \
+            --restart unless-stopped \
+            registration-app:instance-2
+      
+      - name: Health check Instance 2
+        run: |
+          sleep 5
+          curl -f http://localhost:8502 || exit 1
+          echo "✅ Instance 2 deployed on port 8502"
+
+  # Instance 3 - Port 8503
+  deploy-instance-3:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build Docker image for Instance 3
+        working-directory: ./Streamlit_app
+        run: |
+          echo "🔨 Building image: registration-app:instance-3"
+          docker build -t registration-app:instance-3 .
+      
+      - name: Deploy Instance 3 container
+        run: |
+          docker stop registration-instance-3 || true
+          docker rm registration-instance-3 || true
+          docker run -d \
+            -p 8503:8501 \
+            --name registration-instance-3 \
+            --restart unless-stopped \
+            registration-app:instance-3
+      
+      - name: Health check Instance 3
+        run: |
+          sleep 5
+          curl -f http://localhost:8503 || exit 1
+          echo "✅ Instance 3 deployed on port 8503"
+
+  # Instance 4 - Port 8504
+  deploy-instance-4:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build Docker image for Instance 4
+        working-directory: ./Streamlit_app
+        run: |
+          echo "🔨 Building image: registration-app:instance-4"
+          docker build -t registration-app:instance-4 .
+      
+      - name: Deploy Instance 4 container
+        run: |
+          docker stop registration-instance-4 || true
+          docker rm registration-instance-4 || true
+          docker run -d \
+            -p 8504:8501 \
+            --name registration-instance-4 \
+            --restart unless-stopped \
+            registration-app:instance-4
+      
+      - name: Health check Instance 4
+        run: |
+          sleep 5
+          curl -f http://localhost:8504 || exit 1
+          echo "✅ Instance 4 deployed on port 8504"
+
+  # Instance 5 - Port 8505
+  deploy-instance-5:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build Docker image for Instance 5
+        working-directory: ./Streamlit_app
+        run: |
+          echo "🔨 Building image: registration-app:instance-5"
+          docker build -t registration-app:instance-5 .
+      
+      - name: Deploy Instance 5 container
+        run: |
+          docker stop registration-instance-5 || true
+          docker rm registration-instance-5 || true
+          docker run -d \
+            -p 8505:8501 \
+            --name registration-instance-5 \
+            --restart unless-stopped \
+            registration-app:instance-5
+      
+      - name: Health check Instance 5
+        run: |
+          sleep 5
+          curl -f http://localhost:8505 || exit 1
+          echo "✅ Instance 5 deployed on port 8505"
+
+  # Deployment Summary
+  deployment-summary:
+    runs-on: self-hosted
+    needs: [deploy-instance-1, deploy-instance-2, deploy-instance-3, deploy-instance-4, deploy-instance-5]
+    steps:
+      - name: Display deployment summary
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "✅ ALL 5 INSTANCES DEPLOYED SUCCESSFULLY!"
+          echo "═══════════════════════════════════════════════════════════"
+          echo ""
+          echo "🐳 Docker Images Created:"
+          docker images | grep registration-app
+          echo ""
+          echo "📦 Containers Running:"
+          docker ps --filter name=registration-instance --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+          echo ""
+          echo "🌐 Access URLs:"
+          echo "   Instance 1: http://207.180.253.183:8501"
+          echo "   Instance 2: http://207.180.253.183:8502"
+          echo "   Instance 3: http://207.180.253.183:8503"
+          echo "   Instance 4: http://207.180.253.183:8504"
+          echo "   Instance 5: http://207.180.253.183:8505"
+          echo ""
+          echo "⏱️  Deployment completed at: $(date)"
