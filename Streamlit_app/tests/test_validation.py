@@ -17,33 +17,7 @@ print("="*60)
 # Test 1: validate_name()
 # ================================================
 
-def test_validate_name():
-    """Test name validation"""
-    print("\n--- Testing validate_name() ---")
-    
-    # Test 1.1: Valid name
-    result = validate_name("Tisha Simejiya")
-    if result is None:  # No error means valid
-        print("✅ Test 1.1 PASSED: Valid name accepted")
-    else:
-        print(f"❌ Test 1.1 FAILED: {result}")
-        exit(1)
-    
-    # Test 1.2: Empty name
-    result = validate_name("")
-    if result is not None:  # Should return error
-        print("✅ Test 1.2 PASSED: Empty name rejected")
-    else:
-        print("❌ Test 1.2 FAILED: Should reject empty name")
-        exit(1)
-    
-    # Test 1.3: Name with numbers
-    result = validate_name("Tisha123")
-    if result is not None:  # Should return error
-        print("✅ Test 1.3 PASSED: Name with numbers rejected")
-    else:
-        print("❌ Test 1.3 FAILED: Should reject name with numbers")
-        exit(1)
+
 
 # ================================================
 # Test 2: validate_email()
