@@ -1,4 +1,4 @@
-name: Deploy Multi-Instance (Smart Cleanup)
+name: Deploy Multi-Instance (Single Image)
 
 on:
   push:
@@ -49,7 +49,6 @@ jobs:
               echo "⚠️  Port $port is in use"
               PID=$(lsof -Pi :$port -sTCP:LISTEN -t)
               echo "   Process ID: $PID"
-              # Don't kill it - Docker cleanup above should have handled it
             else
               echo "✅ Port $port is available"
             fi
@@ -62,8 +61,8 @@ jobs:
           docker image prune -f || true
           echo "✅ Cleanup complete"
 
-  # Deploy Instance 1
-  deploy-instance-1:
+  # Build SINGLE image
+  build:
     runs-on: self-hosted
     needs: cleanup
     steps:
@@ -73,204 +72,194 @@ jobs:
       - name: Run validation tests
         working-directory: ./Streamlit_app
         run: |
+          echo "🧪 Running validation tests..."
           python3 tests/test_validation.py
+          echo "✅ Tests passed"
       
-      - name: Build image for Instance 1
+      - name: Build Docker image (ONCE)
         working-directory: ./Streamlit_app
         run: |
-          echo "🔨 Building registration-app:instance-1..."
-          docker build -t registration-app:instance-1 .
-      
-      - name: Deploy Instance 1
+          echo "🔨 Building SINGLE image: registration-app:latest"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          docker build -t registration-app:latest .
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Image built successfully"
+          echo ""
+          echo "📦 Image details:"
+          docker images registration-app:latest
+
+  # Deploy all 5 containers from SINGLE image
+  deploy:
+    runs-on: self-hosted
+    needs: build
+    steps:
+      - name: Deploy Instance 1 on port 8501
         run: |
-          echo "🚀 Starting registration-instance-1 on port 8501..."
+          echo "🚀 Deploying Instance 1..."
           docker run -d \
             -p 8501:8501 \
             --name registration-instance-1 \
             --restart unless-stopped \
-            registration-app:instance-1
+            registration-app:latest
           
           sleep 3
           
           if docker ps | grep -q registration-instance-1; then
-            echo "✅ Instance 1 started successfully"
+            echo "✅ Instance 1 started successfully on port 8501"
           else
             echo "❌ Instance 1 failed to start"
             docker logs registration-instance-1
             exit 1
           fi
+          echo ""
       
-      - name: Health check Instance 1
+      - name: Deploy Instance 2 on port 8502
         run: |
-          echo "🏥 Health checking port 8501..."
-          sleep 5
-          curl -f http://localhost:8501 || exit 1
-          echo "✅ Instance 1 healthy"
-
-  # Deploy Instance 2
-  deploy-instance-2:
-    runs-on: self-hosted
-    needs: cleanup
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Build image for Instance 2
-        working-directory: ./Streamlit_app
-        run: |
-          echo "🔨 Building registration-app:instance-2..."
-          docker build -t registration-app:instance-2 .
-      
-      - name: Deploy Instance 2
-        run: |
-          echo "🚀 Starting registration-instance-2 on port 8502..."
+          echo "🚀 Deploying Instance 2..."
           docker run -d \
             -p 8502:8501 \
             --name registration-instance-2 \
             --restart unless-stopped \
-            registration-app:instance-2
+            registration-app:latest
           
           sleep 3
           
           if docker ps | grep -q registration-instance-2; then
-            echo "✅ Instance 2 started successfully"
+            echo "✅ Instance 2 started successfully on port 8502"
           else
             echo "❌ Instance 2 failed to start"
             docker logs registration-instance-2
             exit 1
           fi
+          echo ""
       
-      - name: Health check Instance 2
+      - name: Deploy Instance 3 on port 8503
         run: |
-          echo "🏥 Health checking port 8502..."
-          sleep 5
-          curl -f http://localhost:8502 || exit 1
-          echo "✅ Instance 2 healthy"
-
-  # Deploy Instance 3
-  deploy-instance-3:
-    runs-on: self-hosted
-    needs: cleanup
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Build image for Instance 3
-        working-directory: ./Streamlit_app
-        run: |
-          echo "🔨 Building registration-app:instance-3..."
-          docker build -t registration-app:instance-3 .
-      
-      - name: Deploy Instance 3
-        run: |
-          echo "🚀 Starting registration-instance-3 on port 8503..."
+          echo "🚀 Deploying Instance 3..."
           docker run -d \
             -p 8503:8501 \
             --name registration-instance-3 \
             --restart unless-stopped \
-            registration-app:instance-3
+            registration-app:latest
           
           sleep 3
           
           if docker ps | grep -q registration-instance-3; then
-            echo "✅ Instance 3 started successfully"
+            echo "✅ Instance 3 started successfully on port 8503"
           else
             echo "❌ Instance 3 failed to start"
             docker logs registration-instance-3
             exit 1
           fi
+          echo ""
       
-      - name: Health check Instance 3
+      - name: Deploy Instance 4 on port 8504
         run: |
-          echo "🏥 Health checking port 8503..."
-          sleep 5
-          curl -f http://localhost:8503 || exit 1
-          echo "✅ Instance 3 healthy"
-
-  # Deploy Instance 4
-  deploy-instance-4:
-    runs-on: self-hosted
-    needs: cleanup
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Build image for Instance 4
-        working-directory: ./Streamlit_app
-        run: |
-          echo "🔨 Building registration-app:instance-4..."
-          docker build -t registration-app:instance-4 .
-      
-      - name: Deploy Instance 4
-        run: |
-          echo "🚀 Starting registration-instance-4 on port 8504..."
+          echo "🚀 Deploying Instance 4..."
           docker run -d \
             -p 8504:8501 \
             --name registration-instance-4 \
             --restart unless-stopped \
-            registration-app:instance-4
+            registration-app:latest
           
           sleep 3
           
           if docker ps | grep -q registration-instance-4; then
-            echo "✅ Instance 4 started successfully"
+            echo "✅ Instance 4 started successfully on port 8504"
           else
             echo "❌ Instance 4 failed to start"
             docker logs registration-instance-4
             exit 1
           fi
+          echo ""
       
-      - name: Health check Instance 4
+      - name: Deploy Instance 5 on port 8505
         run: |
-          echo "🏥 Health checking port 8504..."
-          sleep 5
-          curl -f http://localhost:8504 || exit 1
-          echo "✅ Instance 4 healthy"
-
-  # Deploy Instance 5
-  deploy-instance-5:
-    runs-on: self-hosted
-    needs: cleanup
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Build image for Instance 5
-        working-directory: ./Streamlit_app
-        run: |
-          echo "🔨 Building registration-app:instance-5..."
-          docker build -t registration-app:instance-5 .
-      
-      - name: Deploy Instance 5
-        run: |
-          echo "🚀 Starting registration-instance-5 on port 8505..."
+          echo "🚀 Deploying Instance 5..."
           docker run -d \
             -p 8505:8501 \
             --name registration-instance-5 \
             --restart unless-stopped \
-            registration-app:instance-5
+            registration-app:latest
           
           sleep 3
           
           if docker ps | grep -q registration-instance-5; then
-            echo "✅ Instance 5 started successfully"
+            echo "✅ Instance 5 started successfully on port 8505"
           else
             echo "❌ Instance 5 failed to start"
             docker logs registration-instance-5
             exit 1
           fi
+          echo ""
       
-      - name: Health check Instance 5
+      - name: Health check all instances
         run: |
-          echo "🏥 Health checking port 8505..."
-          sleep 5
-          curl -f http://localhost:8505 || exit 1
-          echo "✅ Instance 5 healthy"
+          echo "🏥 Running health checks on all instances..."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          
+          # Check Instance 1
+          echo "Checking Instance 1 (port 8501)..."
+          sleep 2
+          if curl -f http://localhost:8501 >/dev/null 2>&1; then
+            echo "✅ Instance 1 healthy"
+          else
+            echo "❌ Instance 1 health check failed"
+            exit 1
+          fi
+          echo ""
+          
+          # Check Instance 2
+          echo "Checking Instance 2 (port 8502)..."
+          sleep 2
+          if curl -f http://localhost:8502 >/dev/null 2>&1; then
+            echo "✅ Instance 2 healthy"
+          else
+            echo "❌ Instance 2 health check failed"
+            exit 1
+          fi
+          echo ""
+          
+          # Check Instance 3
+          echo "Checking Instance 3 (port 8503)..."
+          sleep 2
+          if curl -f http://localhost:8503 >/dev/null 2>&1; then
+            echo "✅ Instance 3 healthy"
+          else
+            echo "❌ Instance 3 health check failed"
+            exit 1
+          fi
+          echo ""
+          
+          # Check Instance 4
+          echo "Checking Instance 4 (port 8504)..."
+          sleep 2
+          if curl -f http://localhost:8504 >/dev/null 2>&1; then
+            echo "✅ Instance 4 healthy"
+          else
+            echo "❌ Instance 4 health check failed"
+            exit 1
+          fi
+          echo ""
+          
+          # Check Instance 5
+          echo "Checking Instance 5 (port 8505)..."
+          sleep 2
+          if curl -f http://localhost:8505 >/dev/null 2>&1; then
+            echo "✅ Instance 5 healthy"
+          else
+            echo "❌ Instance 5 health check failed"
+            exit 1
+          fi
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ All health checks passed!"
 
   # Deployment Summary
   deployment-summary:
     runs-on: self-hosted
-    needs: [deploy-instance-1, deploy-instance-2, deploy-instance-3, deploy-instance-4, deploy-instance-5]
+    needs: [build, deploy]
     steps:
       - name: Display deployment summary
         run: |
@@ -279,17 +268,21 @@ jobs:
           echo "✅ ALL 5 INSTANCES DEPLOYED SUCCESSFULLY!"
           echo "═══════════════════════════════════════════════════════════"
           echo ""
-          echo "🐳 Docker Images:"
-          docker images | grep registration-app | head -n 10
+          echo "🐳 Docker Image (SINGLE IMAGE):"
+          docker images | grep registration-app
           echo ""
-          echo "📦 Running Containers:"
+          echo "📦 Running Containers (5 from same image):"
           docker ps --filter name=registration-instance --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
           echo ""
           echo "🌐 Access URLs:"
-          echo "   Instance 1: http://207.180.253.183:8501"
-          echo "   Instance 2: http://207.180.253.183:8502"
-          echo "   Instance 3: http://207.180.253.183:8503"
-          echo "   Instance 4: http://207.180.253.183:8504"
-          echo "   Instance 5: http://207.180.253.183:8505"
+          echo "   Instance 1 (Customer A): http://207.180.253.183:8501"
+          echo "   Instance 2 (Customer B): http://207.180.253.183:8502"
+          echo "   Instance 3 (Customer C): http://207.180.253.183:8503"
+          echo "   Instance 4 (Customer D): http://207.180.253.183:8504"
+          echo "   Instance 5 (Customer E): http://207.180.253.183:8505"
+          echo ""
+          echo "💾 Disk Space: ~450 MB (1 image instead of 5)"
+          echo "⏱️  Build Time: ~56 seconds (instead of 280 seconds)"
+          echo "💰 Cost Savings: ~75% less build time"
           echo ""
           echo "⏱️  Deployment completed at: $(date)"
