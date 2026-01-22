@@ -1,0 +1,51 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run validation tests
+        working-directory: ./Streamlit_app
+        run: |
+          python3 tests/test_validation.py
+      
+      - name: Build Docker image
+        working-directory: ./Streamlit_app
+        run: |
+          docker build -t registration-app:latest .
+      
+      - name: Stop old container
+        run: |
+          docker stop registration-app || true
+          docker rm registration-app || true
+      
+      - name: Start new container
+        run: |
+          docker run -d \
+            -p 8501:8501 \
+            --name registration-app \
+            --restart unless-stopped \
+            registration-app:latest
+      
+      - name: Wait for container to start
+        run: |
+          sleep 5
+          docker ps | grep registration-app
+      
+      - name: Health check
+        run: |
+          curl -f http://localhost:8501 || exit 1
+      
+      - name: Deployment successful
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "🌐 App is live at http://207.180.253.183:8501"
