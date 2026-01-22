@@ -14,7 +14,7 @@ def render_registration():
     st.title("User Registration V3")
 
     # --- Full Name Field ---
-    Username = st.text_input("Full Name", placeholder="Enter your full name")
+    Username = st.text_input("Full Name", placeholder="Enter your full Name here")
     
     # Real-time validation (check as user types)
     if Username: 
