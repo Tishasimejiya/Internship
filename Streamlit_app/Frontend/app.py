@@ -7,7 +7,7 @@ from utils.logger import log_app_startup, log_page_navigation
 # Log application startup (BEFORE everything else)
 log_app_startup()
 
-st.set_page_config(page_title="Registration System")
+st.set_page_config(page_title="Registration System ")
 
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 

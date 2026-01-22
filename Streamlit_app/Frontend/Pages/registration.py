@@ -11,7 +11,7 @@ from utils.logger import (
 )
 
 def render_registration():
-    st.title("User Registration")
+    st.title("User Registration V2")
 
     # --- Full Name Field ---
     Username = st.text_input("Full Name", placeholder="Enter your full name")
