@@ -1,5 +1,6 @@
 name: Deploy Multi-Instance (Single Image)
 
+
 on:
   push:
     branches:
@@ -7,6 +8,7 @@ on:
     paths:
       - 'Streamlit_app/**'
       - '.github/workflows/deploy.yml'
+
 
 jobs:
   # Pre-deployment cleanup
@@ -61,6 +63,7 @@ jobs:
           docker image prune -f || true
           echo "✅ Cleanup complete"
 
+
   # Build SINGLE image
   build:
     runs-on: self-hosted
@@ -88,17 +91,30 @@ jobs:
           echo "📦 Image details:"
           docker images registration-app:latest
 
-  # Deploy all 5 containers from SINGLE image
+
+  # Deploy all 5 containers from SINGLE image with DATABASE
   deploy:
     runs-on: self-hosted
     needs: build
+    env:
+      DB_HOST: ${{ secrets.DB_HOST }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      DB_NAME: ${{ secrets.DB_NAME }}
+      DB_PORT: ${{ secrets.DB_PORT }}
     steps:
       - name: Deploy Instance 1 on port 8501
         run: |
-          echo "🚀 Deploying Instance 1..."
+          echo "🚀 Deploying Instance 1 with database connection..."
           docker run -d \
             -p 8501:8501 \
             --name registration-instance-1 \
+            --network app-network \
+            -e DB_HOST=$DB_HOST \
+            -e DB_PORT=$DB_PORT \
+            -e DB_NAME=$DB_NAME \
+            -e DB_USER=$DB_USER \
+            -e DB_PASSWORD=$DB_PASSWORD \
             --restart unless-stopped \
             registration-app:latest
           
@@ -115,10 +131,16 @@ jobs:
       
       - name: Deploy Instance 2 on port 8502
         run: |
-          echo "🚀 Deploying Instance 2..."
+          echo "🚀 Deploying Instance 2 with database connection..."
           docker run -d \
             -p 8502:8501 \
             --name registration-instance-2 \
+            --network app-network \
+            -e DB_HOST=$DB_HOST \
+            -e DB_PORT=$DB_PORT \
+            -e DB_NAME=$DB_NAME \
+            -e DB_USER=$DB_USER \
+            -e DB_PASSWORD=$DB_PASSWORD \
             --restart unless-stopped \
             registration-app:latest
           
@@ -135,10 +157,16 @@ jobs:
       
       - name: Deploy Instance 3 on port 8503
         run: |
-          echo "🚀 Deploying Instance 3..."
+          echo "🚀 Deploying Instance 3 with database connection..."
           docker run -d \
             -p 8503:8501 \
             --name registration-instance-3 \
+            --network app-network \
+            -e DB_HOST=$DB_HOST \
+            -e DB_PORT=$DB_PORT \
+            -e DB_NAME=$DB_NAME \
+            -e DB_USER=$DB_USER \
+            -e DB_PASSWORD=$DB_PASSWORD \
             --restart unless-stopped \
             registration-app:latest
           
@@ -155,10 +183,16 @@ jobs:
       
       - name: Deploy Instance 4 on port 8504
         run: |
-          echo "🚀 Deploying Instance 4..."
+          echo "🚀 Deploying Instance 4 with database connection..."
           docker run -d \
             -p 8504:8501 \
             --name registration-instance-4 \
+            --network app-network \
+            -e DB_HOST=$DB_HOST \
+            -e DB_PORT=$DB_PORT \
+            -e DB_NAME=$DB_NAME \
+            -e DB_USER=$DB_USER \
+            -e DB_PASSWORD=$DB_PASSWORD \
             --restart unless-stopped \
             registration-app:latest
           
@@ -175,10 +209,16 @@ jobs:
       
       - name: Deploy Instance 5 on port 8505
         run: |
-          echo "🚀 Deploying Instance 5..."
+          echo "🚀 Deploying Instance 5 with database connection..."
           docker run -d \
             -p 8505:8501 \
             --name registration-instance-5 \
+            --network app-network \
+            -e DB_HOST=$DB_HOST \
+            -e DB_PORT=$DB_PORT \
+            -e DB_NAME=$DB_NAME \
+            -e DB_USER=$DB_USER \
+            -e DB_PASSWORD=$DB_PASSWORD \
             --restart unless-stopped \
             registration-app:latest
           
@@ -256,6 +296,7 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "✅ All health checks passed!"
 
+
   # Deployment Summary
   deployment-summary:
     runs-on: self-hosted
@@ -284,5 +325,10 @@ jobs:
           echo "💾 Disk Space: ~450 MB (1 image instead of 5)"
           echo "⏱️  Build Time: ~56 seconds (instead of 280 seconds)"
           echo "💰 Cost Savings: ~75% less build time"
+          echo ""
+          echo "🗄️  Database Configuration:"
+          echo "   - PostgreSQL: postgres-db (shared)"
+          echo "   - All 5 instances connected"
+          echo "   - Data persists across deployments"
           echo ""
           echo "⏱️  Deployment completed at: $(date)"

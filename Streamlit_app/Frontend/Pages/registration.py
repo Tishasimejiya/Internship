@@ -9,9 +9,12 @@ from utils.logger import (
     log_registration_failure,
     log_terms_not_accepted
 )
+from utils.database import save_registration_to_db  # NEW IMPORT
+
 
 def render_registration():
     st.title("User Registration V4")
+
 
     # --- Full Name Field ---
     Username = st.text_input("Full Name", placeholder="Enter your full Name here")
@@ -29,6 +32,7 @@ def render_registration():
     # --- Email Field ---
     Email = st.text_input("Email", placeholder="Enter your email address")
 
+
     # Real-time validation
     if Email:
         email_error = validate_email(Email)
@@ -38,6 +42,7 @@ def render_registration():
         else:
             st.success("✅ Email looks good")
             log_validation_success("Email")
+
 
     # --- Password Field ---
     Password = st.text_input("Password", type="password", placeholder="Enter your password")
@@ -123,6 +128,9 @@ def render_registration():
             
             # Log successful registration
             log_successful_registration(Username, Email, registration_date)
+            
+            # Save to PostgreSQL database (NEW!)
+            save_registration_to_db(Username, Email, registration_date)
             
             # Navigate to dashboard
             st.session_state.page = "dashboard"

@@ -1,5 +1,7 @@
 import streamlit as st
 from utils.logger import log_dashboard_access
+from utils.database import get_all_registrations, get_registration_count  # NEW IMPORT
+
 
 def render_dashboard():
     # Log dashboard access (only once when page loads)
@@ -35,3 +37,27 @@ def render_dashboard():
         st.session_state.page = "registration"
         st.session_state.user_data = None
         st.rerun()
+    
+    # NEW SECTION: Show all registrations from database
+    st.markdown("---")
+    st.header("📊 All Registrations (Database)")
+    
+    try:
+        total_count = get_registration_count()
+        st.metric("Total Registrations in Database", total_count)
+        
+        registrations = get_all_registrations()
+        
+        if registrations:
+            for reg in registrations:
+                with st.container():
+                    col1, col2, col3 = st.columns([1, 2, 2])
+                    col1.write(f"**#{reg[0]}**")
+                    col2.write(f"**{reg[1]}**")
+                    col3.write(f"{reg[2]}")
+                    st.caption(f"📅 Registered: {reg[4]}")
+                    st.divider()
+        else:
+            st.info("📭 No registrations in database yet!")
+    except Exception as e:
+        st.error(f"❌ Could not load registrations: {e}")
