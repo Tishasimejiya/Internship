@@ -1,6 +1,5 @@
 name: Deploy Multi-Instance (Single Image)
 
-
 on:
   push:
     branches:
@@ -8,7 +7,6 @@ on:
     paths:
       - 'Streamlit_app/**'
       - '.github/workflows/deploy.yml'
-
 
 jobs:
   # Pre-deployment cleanup
@@ -63,11 +61,36 @@ jobs:
           docker image prune -f || true
           echo "✅ Cleanup complete"
 
+  # Create persistent volumes for file uploads
+  create-volumes:
+    runs-on: self-hosted
+    needs: cleanup
+    steps:
+      - name: Create persistent volumes for uploads
+        run: |
+          echo "📦 Creating persistent volumes for file uploads..."
+          echo ""
+          
+          for i in 1 2 3 4 5; do
+            VOLUME_NAME="registration-uploads-instance-$i"
+            
+            if docker volume ls | grep -q $VOLUME_NAME; then
+              echo "✅ Volume already exists: $VOLUME_NAME"
+            else
+              docker volume create $VOLUME_NAME
+              echo "✅ Created new volume: $VOLUME_NAME"
+            fi
+          done
+          
+          echo ""
+          echo "📊 All volumes:"
+          docker volume ls | grep registration-uploads
+          echo ""
 
   # Build SINGLE image
   build:
     runs-on: self-hosted
-    needs: cleanup
+    needs: create-volumes
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -91,7 +114,6 @@ jobs:
           echo "📦 Image details:"
           docker images registration-app:latest
 
-
   # Deploy all 5 containers from SINGLE image with DATABASE
   deploy:
     runs-on: self-hosted
@@ -105,11 +127,12 @@ jobs:
     steps:
       - name: Deploy Instance 1 on port 8501
         run: |
-          echo "🚀 Deploying Instance 1 with database connection..."
+          echo "🚀 Deploying Instance 1 with database connection and persistent storage..."
           docker run -d \
             -p 8501:8501 \
             --name registration-instance-1 \
             --network app-network \
+            -v registration-uploads-instance-1:/app/Frontend/uploads \
             -e DB_HOST=$DB_HOST \
             -e DB_PORT=$DB_PORT \
             -e DB_NAME=$DB_NAME \
@@ -131,11 +154,12 @@ jobs:
       
       - name: Deploy Instance 2 on port 8502
         run: |
-          echo "🚀 Deploying Instance 2 with database connection..."
+          echo "🚀 Deploying Instance 2 with database connection and persistent storage..."
           docker run -d \
             -p 8502:8501 \
             --name registration-instance-2 \
             --network app-network \
+            -v registration-uploads-instance-2:/app/Frontend/uploads \
             -e DB_HOST=$DB_HOST \
             -e DB_PORT=$DB_PORT \
             -e DB_NAME=$DB_NAME \
@@ -157,11 +181,12 @@ jobs:
       
       - name: Deploy Instance 3 on port 8503
         run: |
-          echo "🚀 Deploying Instance 3 with database connection..."
+          echo "🚀 Deploying Instance 3 with database connection and persistent storage..."
           docker run -d \
             -p 8503:8501 \
             --name registration-instance-3 \
             --network app-network \
+            -v registration-uploads-instance-3:/app/Frontend/uploads \
             -e DB_HOST=$DB_HOST \
             -e DB_PORT=$DB_PORT \
             -e DB_NAME=$DB_NAME \
@@ -183,11 +208,12 @@ jobs:
       
       - name: Deploy Instance 4 on port 8504
         run: |
-          echo "🚀 Deploying Instance 4 with database connection..."
+          echo "🚀 Deploying Instance 4 with database connection and persistent storage..."
           docker run -d \
             -p 8504:8501 \
             --name registration-instance-4 \
             --network app-network \
+            -v registration-uploads-instance-4:/app/Frontend/uploads \
             -e DB_HOST=$DB_HOST \
             -e DB_PORT=$DB_PORT \
             -e DB_NAME=$DB_NAME \
@@ -209,11 +235,12 @@ jobs:
       
       - name: Deploy Instance 5 on port 8505
         run: |
-          echo "🚀 Deploying Instance 5 with database connection..."
+          echo "🚀 Deploying Instance 5 with database connection and persistent storage..."
           docker run -d \
             -p 8505:8501 \
             --name registration-instance-5 \
             --network app-network \
+            -v registration-uploads-instance-5:/app/Frontend/uploads \
             -e DB_HOST=$DB_HOST \
             -e DB_PORT=$DB_PORT \
             -e DB_NAME=$DB_NAME \
@@ -296,7 +323,6 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "✅ All health checks passed!"
 
-
   # Deployment Summary
   deployment-summary:
     runs-on: self-hosted
@@ -315,6 +341,9 @@ jobs:
           echo "📦 Running Containers (5 from same image):"
           docker ps --filter name=registration-instance --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
           echo ""
+          echo "💾 Persistent Volumes (File Uploads):"
+          docker volume ls | grep registration-uploads
+          echo ""
           echo "🌐 Access URLs:"
           echo "   Instance 1 (Customer A): http://207.180.253.183:8501"
           echo "   Instance 2 (Customer B): http://207.180.253.183:8502"
@@ -330,5 +359,10 @@ jobs:
           echo "   - PostgreSQL: postgres-db (shared)"
           echo "   - All 5 instances connected"
           echo "   - Data persists across deployments"
+          echo ""
+          echo "📂 File Upload Storage:"
+          echo "   - Each instance has separate persistent volume"
+          echo "   - Files survive container restarts"
+          echo "   - Upload path: /app/Frontend/uploads"
           echo ""
           echo "⏱️  Deployment completed at: $(date)"
