@@ -13,7 +13,7 @@ from utils.database import save_registration_to_db  # NEW IMPORT
 
 
 def render_registration():
-    st.title("User Registration V4")
+    st.title("User Registration V5")
 
 
     # --- Full Name Field ---
