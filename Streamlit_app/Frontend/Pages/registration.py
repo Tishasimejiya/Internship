@@ -14,7 +14,7 @@ from utils.database import save_registration_to_db
 
 
 def render_registration():
-    st.title("User Registration V5 - With File Upload")
+    st.title("User Registration V6 - With File Backup")
 
     # --- Full Name Field ---
     Username = st.text_input("Full Name", placeholder="Enter your full Name here")
