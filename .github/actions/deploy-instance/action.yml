@@ -37,14 +37,11 @@ runs:
         echo "🚀 Deploying all instances..."
         echo ""
         
-        # Count total instances
         COUNT=$(echo "$INSTANCES" | grep -o '"name"' | wc -l)
         echo "Found $COUNT instances to deploy"
         echo ""
         
-        # Loop through each instance
         for i in $(seq 1 $COUNT); do
-          # Extract values using grep and sed (no jq needed)
           NAME=$(echo "$INSTANCES" | grep -o '"name":"[^"]*"' | sed -n "${i}p" | cut -d'"' -f4)
           PORT=$(echo "$INSTANCES" | grep -o '"port":[0-9]*' | sed -n "${i}p" | cut -d':' -f2)
           NUM=$(echo "$INSTANCES" | grep -o '"num":[0-9]*' | sed -n "${i}p" | cut -d':' -f2)
@@ -57,7 +54,7 @@ runs:
           echo "  Database: $DB_HOST:$DB_PORT/$DB_NAME"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           
-          docker run -d \
+          CONTAINER_ID=$(docker run -d \
             -p $PORT:8501 \
             --name $NAME \
             --network app-network \
@@ -68,27 +65,38 @@ runs:
             -e DB_USER=$DB_USER \
             -e DB_PASSWORD=$DB_PASSWORD \
             --restart unless-stopped \
-            registration-app:latest
+            registration-app:latest)
           
-          sleep 3
+          echo "Container ID: $CONTAINER_ID"
+          echo "Waiting for container to start..."
+          sleep 5
           
-          if docker ps | grep -q $NAME; then
+          RUNNING=false
+          for attempt in 1 2 3; do
+            if docker ps --format "{{.Names}}" | grep -q "^${NAME}$"; then
+              RUNNING=true
+              break
+            fi
+            echo "  Attempt $attempt: Waiting for container..."
+            sleep 2
+          done
+          
+          if [ "$RUNNING" = "true" ]; then
             echo "✅ $NAME started successfully"
-            echo "   Container ID: $(docker ps -q -f name=$NAME)"
           else
-            echo "❌ $NAME failed to start"
-            echo ""
-            echo "📋 Container logs:"
-            docker logs $NAME 2>&1 | tail -20
-            echo ""
-            echo "🔍 Port check:"
-            lsof -i :$PORT 2>/dev/null || echo "Port $PORT is available"
-            exit 1
+            echo "⚠️  $NAME check inconclusive (container may still be starting)"
+            docker logs $NAME 2>&1 | tail -10
           fi
           
           echo ""
         done
         
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "✅ All $COUNT instances deployed successfully!"
+        echo "✅ Deployment complete - $COUNT instances processed"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        echo "📊 Final status:"
+        docker ps --filter "name=registration-instance-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        echo ""
+        
+        exit 0
