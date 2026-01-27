@@ -1,0 +1,32 @@
+name: 'Create Volumes'
+description: 'Creates persistent Docker volumes for file uploads'
+
+inputs:
+  instances:
+    description: 'JSON array of instances'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Create persistent volumes
+      shell: bash
+      env:
+        INSTANCES: ${{ inputs.instances }}
+      run: |
+        echo "📦 Creating persistent volumes for file uploads..."
+        echo ""
+        
+        echo "$INSTANCES" | jq -r '.[] | "registration-uploads-instance-\(.num)"' | while read volume; do
+          if docker volume ls | grep -q "^$volume$"; then
+            echo "✅ Volume already exists: $volume"
+          else
+            docker volume create $volume
+            echo "✅ Created new volume: $volume"
+          fi
+        done
+        
+        echo ""
+        echo "📊 All registration volumes:"
+        docker volume ls | grep registration-uploads || echo "No volumes found"
+        echo ""

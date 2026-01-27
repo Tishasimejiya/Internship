@@ -1,4 +1,4 @@
-name: Deploy Multi-Instance (Single Image)
+name: Deploy Registration App (Dynamic)
 
 on:
   push:
@@ -6,363 +6,145 @@ on:
       - main
     paths:
       - 'Streamlit_app/**'
-      - '.github/workflows/deploy.yml'
+      - '.github/**'
 
 jobs:
-  # Pre-deployment cleanup
-  cleanup:
+  # ═══════════════════════════════════════════════════════════
+  # JOB 1: DISCOVER - Find all existing containers
+  # ═══════════════════════════════════════════════════════════
+  discover:
+    name: 🔍 Discover Instances
     runs-on: self-hosted
+    outputs:
+      instances: ${{ steps.discover.outputs.instances }}
     steps:
-      - name: Smart cleanup - Stop ALL related containers
-        run: |
-          echo "🧹 Starting smart cleanup..."
-          echo ""
-          
-          # Find and stop ALL containers with 'registration' in name
-          echo "🔍 Finding all registration containers..."
-          CONTAINERS=$(docker ps -a --filter "name=registration" --format "{{.Names}}" | tr '\n' ' ')
-          
-          if [ -z "$CONTAINERS" ]; then
-            echo "✅ No old containers found. Clean slate!"
-          else
-            echo "Found containers: $CONTAINERS"
-            echo "🛑 Stopping and removing..."
-            
-            for container in $CONTAINERS; do
-              echo "  - Stopping $container..."
-              docker stop $container || true
-              echo "  - Removing $container..."
-              docker rm $container || true
-            done
-            
-            echo "✅ All old containers cleaned up"
-          fi
-          echo ""
-          
-      - name: Check port availability
-        run: |
-          echo "🔍 Checking port availability..."
-          echo ""
-          
-          for port in 8501 8502 8503 8504 8505; do
-            if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1 ; then
-              echo "⚠️  Port $port is in use"
-              PID=$(lsof -Pi :$port -sTCP:LISTEN -t)
-              echo "   Process ID: $PID"
-            else
-              echo "✅ Port $port is available"
-            fi
-          done
-          echo ""
-          
-      - name: Cleanup old images (optional)
-        run: |
-          echo "🧹 Cleaning up old dangling images..."
-          docker image prune -f || true
-          echo "✅ Cleanup complete"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Discover all instances
+        id: discover
+        uses: ./.github/actions/discover-instances
 
-  # Create persistent volumes for file uploads
-  create-volumes:
+  # ═══════════════════════════════════════════════════════════
+  # JOB 2: CLEANUP - Stop and remove all containers
+  # ═══════════════════════════════════════════════════════════
+  cleanup:
+    name: 🧹 Cleanup Containers
+    runs-on: self-hosted
+    needs: discover
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Cleanup all containers
+        uses: ./.github/actions/cleanup-containers
+        with:
+          instances: ${{ needs.discover.outputs.instances }}
+
+  # ═══════════════════════════════════════════════════════════
+  # JOB 3: TEST - Run validation tests
+  # ═══════════════════════════════════════════════════════════
+  test:
+    name: 🧪 Run Tests
     runs-on: self-hosted
     needs: cleanup
-    steps:
-      - name: Create persistent volumes for uploads
-        run: |
-          echo "📦 Creating persistent volumes for file uploads..."
-          echo ""
-          
-          for i in 1 2 3 4 5; do
-            VOLUME_NAME="registration-uploads-instance-$i"
-            
-            if docker volume ls | grep -q $VOLUME_NAME; then
-              echo "✅ Volume already exists: $VOLUME_NAME"
-            else
-              docker volume create $VOLUME_NAME
-              echo "✅ Created new volume: $VOLUME_NAME"
-            fi
-          done
-          
-          echo ""
-          echo "📊 All volumes:"
-          docker volume ls | grep registration-uploads
-          echo ""
-
-  # Build SINGLE image
-  build:
-    runs-on: self-hosted
-    needs: create-volumes
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
       - name: Run validation tests
         working-directory: ./Streamlit_app
-        run: |
-          echo "🧪 Running validation tests..."
-          python3 tests/test_validation.py
-          echo "✅ Tests passed"
+        run: python3 tests/test_validation.py
+
+  # ═══════════════════════════════════════════════════════════
+  # JOB 4: BUILD - Build Docker image
+  # ═══════════════════════════════════════════════════════════
+  build:
+    name: 🔨 Build Image
+    runs-on: self-hosted
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
       
-      - name: Build Docker image (ONCE)
+      - name: Build Docker image
         working-directory: ./Streamlit_app
         run: |
-          echo "🔨 Building SINGLE image: registration-app:latest"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔨 Building Docker image..."
           docker build -t registration-app:latest .
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "✅ Image built successfully"
-          echo ""
-          echo "📦 Image details:"
-          docker images registration-app:latest
+          echo "✅ Build complete"
 
-  # Deploy all 5 containers from SINGLE image with DATABASE
+  # ═══════════════════════════════════════════════════════════
+  # JOB 5: CREATE VOLUMES - Ensure volumes exist
+  # ═══════════════════════════════════════════════════════════
+  create-volumes:
+    name: 📦 Create Volumes
+    runs-on: self-hosted
+    needs: [discover, build]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Create persistent volumes
+        uses: ./.github/actions/create-volumes
+        with:
+          instances: ${{ needs.discover.outputs.instances }}
+
+  # ═══════════════════════════════════════════════════════════
+  # JOB 6: DEPLOY - Deploy all containers
+  # ═══════════════════════════════════════════════════════════
   deploy:
+    name: 🚀 Deploy Instances
     runs-on: self-hosted
-    needs: build
-    env:
-      DB_HOST: ${{ secrets.DB_HOST }}
-      DB_USER: ${{ secrets.DB_USER }}
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-      DB_NAME: ${{ secrets.DB_NAME }}
-      DB_PORT: ${{ secrets.DB_PORT }}
+    needs: [discover, create-volumes]
     steps:
-      - name: Deploy Instance 1 on port 8501
-        run: |
-          echo "🚀 Deploying Instance 1 with database connection and persistent storage..."
-          docker run -d \
-            -p 8501:8501 \
-            --name registration-instance-1 \
-            --network app-network \
-            -v registration-uploads-instance-1:/app/Frontend/uploads \
-            -e DB_HOST=$DB_HOST \
-            -e DB_PORT=$DB_PORT \
-            -e DB_NAME=$DB_NAME \
-            -e DB_USER=$DB_USER \
-            -e DB_PASSWORD=$DB_PASSWORD \
-            --restart unless-stopped \
-            registration-app:latest
-          
-          sleep 3
-          
-          if docker ps | grep -q registration-instance-1; then
-            echo "✅ Instance 1 started successfully on port 8501"
-          else
-            echo "❌ Instance 1 failed to start"
-            docker logs registration-instance-1
-            exit 1
-          fi
-          echo ""
+      - name: Checkout code
+        uses: actions/checkout@v4
       
-      - name: Deploy Instance 2 on port 8502
-        run: |
-          echo "🚀 Deploying Instance 2 with database connection and persistent storage..."
-          docker run -d \
-            -p 8502:8501 \
-            --name registration-instance-2 \
-            --network app-network \
-            -v registration-uploads-instance-2:/app/Frontend/uploads \
-            -e DB_HOST=$DB_HOST \
-            -e DB_PORT=$DB_PORT \
-            -e DB_NAME=$DB_NAME \
-            -e DB_USER=$DB_USER \
-            -e DB_PASSWORD=$DB_PASSWORD \
-            --restart unless-stopped \
-            registration-app:latest
-          
-          sleep 3
-          
-          if docker ps | grep -q registration-instance-2; then
-            echo "✅ Instance 2 started successfully on port 8502"
-          else
-            echo "❌ Instance 2 failed to start"
-            docker logs registration-instance-2
-            exit 1
-          fi
-          echo ""
-      
-      - name: Deploy Instance 3 on port 8503
-        run: |
-          echo "🚀 Deploying Instance 3 with database connection and persistent storage..."
-          docker run -d \
-            -p 8503:8501 \
-            --name registration-instance-3 \
-            --network app-network \
-            -v registration-uploads-instance-3:/app/Frontend/uploads \
-            -e DB_HOST=$DB_HOST \
-            -e DB_PORT=$DB_PORT \
-            -e DB_NAME=$DB_NAME \
-            -e DB_USER=$DB_USER \
-            -e DB_PASSWORD=$DB_PASSWORD \
-            --restart unless-stopped \
-            registration-app:latest
-          
-          sleep 3
-          
-          if docker ps | grep -q registration-instance-3; then
-            echo "✅ Instance 3 started successfully on port 8503"
-          else
-            echo "❌ Instance 3 failed to start"
-            docker logs registration-instance-3
-            exit 1
-          fi
-          echo ""
-      
-      - name: Deploy Instance 4 on port 8504
-        run: |
-          echo "🚀 Deploying Instance 4 with database connection and persistent storage..."
-          docker run -d \
-            -p 8504:8501 \
-            --name registration-instance-4 \
-            --network app-network \
-            -v registration-uploads-instance-4:/app/Frontend/uploads \
-            -e DB_HOST=$DB_HOST \
-            -e DB_PORT=$DB_PORT \
-            -e DB_NAME=$DB_NAME \
-            -e DB_USER=$DB_USER \
-            -e DB_PASSWORD=$DB_PASSWORD \
-            --restart unless-stopped \
-            registration-app:latest
-          
-          sleep 3
-          
-          if docker ps | grep -q registration-instance-4; then
-            echo "✅ Instance 4 started successfully on port 8504"
-          else
-            echo "❌ Instance 4 failed to start"
-            docker logs registration-instance-4
-            exit 1
-          fi
-          echo ""
-      
-      - name: Deploy Instance 5 on port 8505
-        run: |
-          echo "🚀 Deploying Instance 5 with database connection and persistent storage..."
-          docker run -d \
-            -p 8505:8501 \
-            --name registration-instance-5 \
-            --network app-network \
-            -v registration-uploads-instance-5:/app/Frontend/uploads \
-            -e DB_HOST=$DB_HOST \
-            -e DB_PORT=$DB_PORT \
-            -e DB_NAME=$DB_NAME \
-            -e DB_USER=$DB_USER \
-            -e DB_PASSWORD=$DB_PASSWORD \
-            --restart unless-stopped \
-            registration-app:latest
-          
-          sleep 3
-          
-          if docker ps | grep -q registration-instance-5; then
-            echo "✅ Instance 5 started successfully on port 8505"
-          else
-            echo "❌ Instance 5 failed to start"
-            docker logs registration-instance-5
-            exit 1
-          fi
-          echo ""
-      
-      - name: Health check all instances
-        run: |
-          echo "🏥 Running health checks on all instances..."
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo ""
-          
-          # Check Instance 1
-          echo "Checking Instance 1 (port 8501)..."
-          sleep 2
-          if curl -f http://localhost:8501 >/dev/null 2>&1; then
-            echo "✅ Instance 1 healthy"
-          else
-            echo "❌ Instance 1 health check failed"
-            exit 1
-          fi
-          echo ""
-          
-          # Check Instance 2
-          echo "Checking Instance 2 (port 8502)..."
-          sleep 2
-          if curl -f http://localhost:8502 >/dev/null 2>&1; then
-            echo "✅ Instance 2 healthy"
-          else
-            echo "❌ Instance 2 health check failed"
-            exit 1
-          fi
-          echo ""
-          
-          # Check Instance 3
-          echo "Checking Instance 3 (port 8503)..."
-          sleep 2
-          if curl -f http://localhost:8503 >/dev/null 2>&1; then
-            echo "✅ Instance 3 healthy"
-          else
-            echo "❌ Instance 3 health check failed"
-            exit 1
-          fi
-          echo ""
-          
-          # Check Instance 4
-          echo "Checking Instance 4 (port 8504)..."
-          sleep 2
-          if curl -f http://localhost:8504 >/dev/null 2>&1; then
-            echo "✅ Instance 4 healthy"
-          else
-            echo "❌ Instance 4 health check failed"
-            exit 1
-          fi
-          echo ""
-          
-          # Check Instance 5
-          echo "Checking Instance 5 (port 8505)..."
-          sleep 2
-          if curl -f http://localhost:8505 >/dev/null 2>&1; then
-            echo "✅ Instance 5 healthy"
-          else
-            echo "❌ Instance 5 health check failed"
-            exit 1
-          fi
-          echo ""
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "✅ All health checks passed!"
+      - name: Deploy all instances
+        uses: ./.github/actions/deploy-instance
+        with:
+          instances: ${{ needs.discover.outputs.instances }}
+          db_host: ${{ secrets.DB_HOST }}
+          db_port: ${{ secrets.DB_PORT }}
+          db_name: ${{ secrets.DB_NAME }}
+          db_user: ${{ secrets.DB_USER }}
+          db_password: ${{ secrets.DB_PASSWORD }}
 
-  # Deployment Summary
-  deployment-summary:
+  # ═══════════════════════════════════════════════════════════
+  # JOB 7: HEALTH CHECK - Verify all instances are running
+  # ═══════════════════════════════════════════════════════════
+  health-check:
+    name: 🏥 Health Check
     runs-on: self-hosted
-    needs: [build, deploy]
+    needs: [discover, deploy]
     steps:
-      - name: Display deployment summary
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run health checks
+        uses: ./.github/actions/health-check
+        with:
+          instances: ${{ needs.discover.outputs.instances }}
+
+  # ═══════════════════════════════════════════════════════════
+  # JOB 8: SUMMARY - Show deployment summary
+  # ═══════════════════════════════════════════════════════════
+  summary:
+    name: 📊 Deployment Summary
+    runs-on: self-hosted
+    needs: [discover, health-check]
+    steps:
+      - name: Display summary
         run: |
+          echo "════════════════════════════════════════════════════"
+          echo "✅ DEPLOYMENT COMPLETE"
+          echo "════════════════════════════════════════════════════"
           echo ""
-          echo "═══════════════════════════════════════════════════════════"
-          echo "✅ ALL 5 INSTANCES DEPLOYED SUCCESSFULLY!"
-          echo "═══════════════════════════════════════════════════════════"
+          echo "Deployed instances:"
+          echo '${{ needs.discover.outputs.instances }}' | jq -r '.[] | "  • \(.name) on port \(.port)"'
           echo ""
-          echo "🐳 Docker Image (SINGLE IMAGE):"
-          docker images | grep registration-app
+          echo "Access your applications:"
+          echo '${{ needs.discover.outputs.instances }}' | jq -r '.[] | "  http://207.180.253.183:\(.port)"'
           echo ""
-          echo "📦 Running Containers (5 from same image):"
-          docker ps --filter name=registration-instance --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
-          echo ""
-          echo "💾 Persistent Volumes (File Uploads):"
-          docker volume ls | grep registration-uploads
-          echo ""
-          echo "🌐 Access URLs:"
-          echo "   Instance 1 (Customer A): http://207.180.253.183:8501"
-          echo "   Instance 2 (Customer B): http://207.180.253.183:8502"
-          echo "   Instance 3 (Customer C): http://207.180.253.183:8503"
-          echo "   Instance 4 (Customer D): http://207.180.253.183:8504"
-          echo "   Instance 5 (Customer E): http://207.180.253.183:8505"
-          echo ""
-          echo "💾 Disk Space: ~450 MB (1 image instead of 5)"
-          echo "⏱️  Build Time: ~56 seconds (instead of 280 seconds)"
-          echo "💰 Cost Savings: ~75% less build time"
-          echo ""
-          echo "🗄️  Database Configuration:"
-          echo "   - PostgreSQL: postgres-db (shared)"
-          echo "   - All 5 instances connected"
-          echo "   - Data persists across deployments"
-          echo ""
-          echo "📂 File Upload Storage:"
-          echo "   - Each instance has separate persistent volume"
-          echo "   - Files survive container restarts"
-          echo "   - Upload path: /app/Frontend/uploads"
-          echo ""
-          echo "⏱️  Deployment completed at: $(date)"
+          echo "════════════════════════════════════════════════════"

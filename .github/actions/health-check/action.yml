@@ -1,0 +1,62 @@
+name: 'Health Check'
+description: 'Verifies all instances are running and responding'
+
+inputs:
+  instances:
+    description: 'JSON array of instances to check'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run health checks
+      shell: bash
+      env:
+        INSTANCES: ${{ inputs.instances }}
+      run: |
+        echo "🏥 Running health checks on all instances..."
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        
+        HEALTHY=0
+        UNHEALTHY=0
+        
+        echo "$INSTANCES" | jq -c '.[]' | while read instance; do
+          NAME=$(echo $instance | jq -r '.name')
+          PORT=$(echo $instance | jq -r '.port')
+          
+          echo "Checking $NAME on port $PORT..."
+          
+          sleep 2
+          
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$PORT 2>/dev/null || echo "000")
+          
+          if [ "$RESPONSE" = "200" ] || [ "$RESPONSE" = "302" ]; then
+            echo "✅ $NAME is healthy (HTTP $RESPONSE)"
+            HEALTHY=$((HEALTHY + 1))
+          else
+            echo "❌ $NAME is unhealthy (HTTP $RESPONSE)"
+            echo ""
+            echo "📋 Recent logs from $NAME:"
+            docker logs $NAME --tail 30 2>&1
+            echo ""
+            UNHEALTHY=$((UNHEALTHY + 1))
+          fi
+          
+          echo ""
+        done
+        
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "Health Check Summary:"
+        echo "  ✅ Healthy: $HEALTHY"
+        echo "  ❌ Unhealthy: $UNHEALTHY"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        if [ $UNHEALTHY -gt 0 ]; then
+          echo ""
+          echo "❌ Health check failed for one or more instances"
+          exit 1
+        fi
+        
+        echo ""
+        echo "✅ All instances are healthy!"

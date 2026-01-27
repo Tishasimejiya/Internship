@@ -1,0 +1,92 @@
+name: 'Deploy Instances'
+description: 'Deploys all registration containers with database connection'
+
+inputs:
+  instances:
+    description: 'JSON array of instances to deploy'
+    required: true
+  db_host:
+    description: 'Database host'
+    required: true
+  db_port:
+    description: 'Database port'
+    required: true
+  db_name:
+    description: 'Database name'
+    required: true
+  db_user:
+    description: 'Database user'
+    required: true
+  db_password:
+    description: 'Database password'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Deploy all instances
+      shell: bash
+      env:
+        INSTANCES: ${{ inputs.instances }}
+        DB_HOST: ${{ inputs.db_host }}
+        DB_PORT: ${{ inputs.db_port }}
+        DB_NAME: ${{ inputs.db_name }}
+        DB_USER: ${{ inputs.db_user }}
+        DB_PASSWORD: ${{ inputs.db_password }}
+      run: |
+        echo "🚀 Deploying all instances..."
+        echo ""
+        
+        DEPLOYED=0
+        FAILED=0
+        
+        echo "$INSTANCES" | jq -c '.[]' | while read instance; do
+          NAME=$(echo $instance | jq -r '.name')
+          PORT=$(echo $instance | jq -r '.port')
+          NUM=$(echo $instance | jq -r '.num')
+          VOLUME="registration-uploads-instance-$NUM"
+          
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Deploying: $NAME"
+          echo "  Port: $PORT (host) → 8501 (container)"
+          echo "  Volume: $VOLUME"
+          echo "  Database: $DB_HOST:$DB_PORT/$DB_NAME"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          
+          docker run -d \
+            -p $PORT:8501 \
+            --name $NAME \
+            --network app-network \
+            -v $VOLUME:/app/Frontend/uploads \
+            -e DB_HOST=$DB_HOST \
+            -e DB_PORT=$DB_PORT \
+            -e DB_NAME=$DB_NAME \
+            -e DB_USER=$DB_USER \
+            -e DB_PASSWORD=$DB_PASSWORD \
+            --restart unless-stopped \
+            registration-app:latest
+          
+          sleep 3
+          
+          if docker ps | grep -q $NAME; then
+            echo "✅ $NAME started successfully"
+            echo "   Container ID: $(docker ps -q -f name=$NAME)"
+            DEPLOYED=$((DEPLOYED + 1))
+          else
+            echo "❌ $NAME failed to start"
+            echo ""
+            echo "📋 Container logs:"
+            docker logs $NAME 2>&1 | tail -20
+            echo ""
+            echo "🔍 Port check:"
+            lsof -i :$PORT 2>/dev/null || echo "Port $PORT is available"
+            FAILED=$((FAILED + 1))
+            exit 1
+          fi
+          
+          echo ""
+        done
+        
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "✅ Deployment complete!"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

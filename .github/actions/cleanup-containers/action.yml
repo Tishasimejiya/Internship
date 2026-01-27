@@ -1,0 +1,50 @@
+name: 'Cleanup Containers'
+description: 'Stops and removes all registration containers'
+
+inputs:
+  instances:
+    description: 'JSON array of instances'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cleanup all containers
+      shell: bash
+      run: |
+        echo "🧹 Starting cleanup of all registration containers..."
+        echo ""
+        
+        CONTAINERS=$(docker ps -a --filter "name=registration-instance-" --format "{{.Names}}")
+        
+        if [ -z "$CONTAINERS" ]; then
+          echo "✅ No containers to cleanup. Clean slate!"
+        else
+          echo "Found containers to remove:"
+          echo "$CONTAINERS"
+          echo ""
+          
+          for container in $CONTAINERS; do
+            echo "🛑 Stopping $container..."
+            docker stop $container 2>/dev/null || echo "  (already stopped)"
+            
+            echo "🗑️  Removing $container..."
+            docker rm $container 2>/dev/null || echo "  (already removed)"
+            
+            echo "✅ $container cleaned up"
+            echo ""
+          done
+          
+          echo "✅ All containers cleaned up successfully!"
+        fi
+        
+        echo ""
+        echo "🔍 Checking port availability..."
+        for port in 8501 8502 8503 8504 8505 8506 8507 8508 8509 8510; do
+          if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+            echo "⚠️  Port $port is in use"
+          else
+            echo "✅ Port $port is available"
+          fi
+        done
+        echo ""

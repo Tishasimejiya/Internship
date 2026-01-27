@@ -1,0 +1,64 @@
+name: 'Discover Instances'
+description: 'Scans for all existing registration containers'
+
+outputs:
+  instances:
+    description: 'JSON array of instance configurations'
+    value: ${{ steps.scan.outputs.instances }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Scan for instances
+      id: scan
+      shell: bash
+      run: |
+        echo "🔍 Discovering all registration instances..."
+        echo ""
+        
+        CONTAINERS=$(docker ps -a --filter "name=registration-instance-" --format "{{.Names}}" | sort)
+        
+        if [ -z "$CONTAINERS" ]; then
+          echo "ℹ️  No existing containers found. Using default (5 instances)"
+          INSTANCES='[{"name":"registration-instance-1","port":8501,"num":1},{"name":"registration-instance-2","port":8502,"num":2},{"name":"registration-instance-3","port":8503,"num":3},{"name":"registration-instance-4","port":8504,"num":4},{"name":"registration-instance-5","port":8505,"num":5}]'
+        else
+          echo "✅ Found existing containers:"
+          echo "$CONTAINERS"
+          echo ""
+          
+          INSTANCES="["
+          FIRST=true
+          
+          for container in $CONTAINERS; do
+            # Extract instance number
+            NUM=$(echo $container | grep -o '[0-9]\+$')
+            
+            # Try to get ACTUAL port from running container
+            PORT=$(docker port $container 8501 2>/dev/null | cut -d':' -f2)
+            
+            # If container is stopped or port not found, calculate default
+            if [ -z "$PORT" ]; then
+              PORT=$((8500 + NUM))
+              echo "  $container: Port not detected (container may be stopped), using default $PORT"
+            else
+              echo "  $container: Detected running on port $PORT"
+            fi
+            
+            # Build JSON
+            if [ "$FIRST" = false ]; then
+              INSTANCES+=","
+            fi
+            FIRST=false
+            
+            INSTANCES+="{\"name\":\"$container\",\"port\":$PORT,\"num\":$NUM}"
+          done
+          
+          INSTANCES+="]"
+        fi
+        
+        echo ""
+        echo "📊 Final Configuration:"
+        echo "$INSTANCES" | jq '.'
+        echo ""
+        
+        echo "instances=$INSTANCES" >> $GITHUB_OUTPUT
