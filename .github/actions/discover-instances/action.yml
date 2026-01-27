@@ -13,10 +13,12 @@ runs:
       id: scan
       shell: bash
       run: |
+        set -e
+        
         echo "🔍 Discovering all registration instances..."
         echo ""
         
-        CONTAINERS=$(docker ps -a --filter "name=registration-instance-" --format "{{.Names}}" | sort)
+        CONTAINERS=$(docker ps -a --filter "name=registration-instance-" --format "{{.Names}}" | sort || true)
         
         if [ -z "$CONTAINERS" ]; then
           echo "ℹ️  No existing containers found. Using default (5 instances)"
@@ -30,16 +32,9 @@ runs:
           FIRST=true
           
           for container in $CONTAINERS; do
-            NUM=$(echo $container | grep -o '[0-9]\+$')
-            
-            PORT=$(docker port $container 8501 2>/dev/null | cut -d':' -f2)
-            
-            if [ -z "$PORT" ]; then
-              PORT=$((8500 + NUM))
-              echo "  $container: Port not detected, using default $PORT"
-            else
-              echo "  $container: Detected on port $PORT"
-            fi
+            NUM=$(echo $container | grep -o '[0-9]\+$' || echo "1")
+            PORT=$((8500 + NUM))
+            echo "  $container: Will use port $PORT"
             
             if [ "$FIRST" = false ]; then
               INSTANCES+=","
@@ -53,7 +48,8 @@ runs:
         fi
         
         echo ""
-        echo "📊 Configuration: $INSTANCES"
+        echo "📊 Final Configuration:"
+        echo "$INSTANCES"
         echo ""
         
         echo "instances=$INSTANCES" >> $GITHUB_OUTPUT
