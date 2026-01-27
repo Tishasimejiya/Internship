@@ -37,13 +37,17 @@ runs:
         echo "🚀 Deploying all instances..."
         echo ""
         
-        DEPLOYED=0
-        FAILED=0
+        # Count total instances
+        COUNT=$(echo "$INSTANCES" | grep -o '"name"' | wc -l)
+        echo "Found $COUNT instances to deploy"
+        echo ""
         
-        echo "$INSTANCES" | jq -c '.[]' | while read instance; do
-          NAME=$(echo $instance | jq -r '.name')
-          PORT=$(echo $instance | jq -r '.port')
-          NUM=$(echo $instance | jq -r '.num')
+        # Loop through each instance
+        for i in $(seq 1 $COUNT); do
+          # Extract values using grep and sed (no jq needed)
+          NAME=$(echo "$INSTANCES" | grep -o '"name":"[^"]*"' | sed -n "${i}p" | cut -d'"' -f4)
+          PORT=$(echo "$INSTANCES" | grep -o '"port":[0-9]*' | sed -n "${i}p" | cut -d':' -f2)
+          NUM=$(echo "$INSTANCES" | grep -o '"num":[0-9]*' | sed -n "${i}p" | cut -d':' -f2)
           VOLUME="registration-uploads-instance-$NUM"
           
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -71,7 +75,6 @@ runs:
           if docker ps | grep -q $NAME; then
             echo "✅ $NAME started successfully"
             echo "   Container ID: $(docker ps -q -f name=$NAME)"
-            DEPLOYED=$((DEPLOYED + 1))
           else
             echo "❌ $NAME failed to start"
             echo ""
@@ -80,7 +83,6 @@ runs:
             echo ""
             echo "🔍 Port check:"
             lsof -i :$PORT 2>/dev/null || echo "Port $PORT is available"
-            FAILED=$((FAILED + 1))
             exit 1
           fi
           
@@ -88,5 +90,5 @@ runs:
         done
         
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "✅ Deployment complete!"
+        echo "✅ All $COUNT instances deployed successfully!"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

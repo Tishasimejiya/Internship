@@ -30,21 +30,17 @@ runs:
           FIRST=true
           
           for container in $CONTAINERS; do
-            # Extract instance number
             NUM=$(echo $container | grep -o '[0-9]\+$')
             
-            # Try to get ACTUAL port from running container
             PORT=$(docker port $container 8501 2>/dev/null | cut -d':' -f2)
             
-            # If container is stopped or port not found, calculate default
             if [ -z "$PORT" ]; then
               PORT=$((8500 + NUM))
-              echo "  $container: Port not detected (container may be stopped), using default $PORT"
+              echo "  $container: Port not detected, using default $PORT"
             else
-              echo "  $container: Detected running on port $PORT"
+              echo "  $container: Detected on port $PORT"
             fi
             
-            # Build JSON
             if [ "$FIRST" = false ]; then
               INSTANCES+=","
             fi
@@ -57,8 +53,7 @@ runs:
         fi
         
         echo ""
-        echo "📊 Final Configuration:"
-        echo "$INSTANCES" | jq '.'
+        echo "📊 Configuration: $INSTANCES"
         echo ""
         
         echo "instances=$INSTANCES" >> $GITHUB_OUTPUT

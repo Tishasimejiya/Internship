@@ -17,8 +17,11 @@ runs:
         echo "📦 Creating persistent volumes for file uploads..."
         echo ""
         
-        echo "$INSTANCES" | jq -r '.[] | "registration-uploads-instance-\(.num)"' | while read volume; do
-          if docker volume ls | grep -q "^$volume$"; then
+        # Extract instance numbers from JSON using grep
+        echo "$INSTANCES" | grep -o '"num":[0-9]\+' | cut -d':' -f2 | while read num; do
+          volume="registration-uploads-instance-$num"
+          
+          if docker volume ls | grep -q "$volume"; then
             echo "✅ Volume already exists: $volume"
           else
             docker volume create $volume

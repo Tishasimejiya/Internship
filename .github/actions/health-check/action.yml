@@ -21,9 +21,13 @@ runs:
         HEALTHY=0
         UNHEALTHY=0
         
-        echo "$INSTANCES" | jq -c '.[]' | while read instance; do
-          NAME=$(echo $instance | jq -r '.name')
-          PORT=$(echo $instance | jq -r '.port')
+        # Count total instances
+        COUNT=$(echo "$INSTANCES" | grep -o '"name"' | wc -l)
+        
+        # Loop through each instance
+        for i in $(seq 1 $COUNT); do
+          NAME=$(echo "$INSTANCES" | grep -o '"name":"[^"]*"' | sed -n "${i}p" | cut -d'"' -f4)
+          PORT=$(echo "$INSTANCES" | grep -o '"port":[0-9]*' | sed -n "${i}p" | cut -d':' -f2)
           
           echo "Checking $NAME on port $PORT..."
           
