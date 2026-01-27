@@ -92,7 +92,7 @@ runs:
         done
         
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "✅ Deployment complete - $COUNT instances processed"
+        echo "✅ Deployment complete v1 - $COUNT instances processed"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         echo "📊 Final status:"
