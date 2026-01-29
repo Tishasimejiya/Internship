@@ -21,7 +21,7 @@ runs:
         CONTAINERS=$(docker ps -a --filter "name=customer-a-instance-" --format "{{.Names}}" 2>/dev/null | sort)
         
         if [ -z "$CONTAINERS" ]; then
-          echo "ℹ️  No existing containers found. Using default (5 instances)"
+          echo "ℹ️  No existing containers found. Now using default (5 instances)"
           INSTANCES='[{"name":"customer-a-instance-1","port":8601,"num":1},{"name":"customer-a-instance-2","port":8602,"num":2},{"name":"customer-a-instance-3","port":8603,"num":3},{"name":"customer-a-instance-4","port":8604,"num":4},{"name":"customer-a-instance-5","port":8605,"num":5}]'
         else
           echo "✅ Found existing containers:"
