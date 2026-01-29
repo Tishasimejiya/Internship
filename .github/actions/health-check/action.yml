@@ -65,4 +65,4 @@ runs:
         fi
         
         echo ""
-        echo "✅ All customer-a instances are healthy!"
+        echo "✅ All customer-A instances are healthy!"
