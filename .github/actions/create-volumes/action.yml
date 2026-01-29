@@ -1,10 +1,12 @@
 name: 'Create Volumes'
-description: 'Creates persistent Docker volumes for file uploads'
+description: 'Creates persistent Docker volumes for customer-a file uploads'
+
 
 inputs:
   instances:
     description: 'JSON array of instances'
     required: true
+
 
 runs:
   using: "composite"
@@ -14,12 +16,12 @@ runs:
       env:
         INSTANCES: ${{ inputs.instances }}
       run: |
-        echo "📦 Creating persistent volumes for file uploads..."
+        echo "📦 Creating persistent volumes for customer-a file uploads..."
         echo ""
         
         # Extract instance numbers from JSON using grep
         echo "$INSTANCES" | grep -o '"num":[0-9]\+' | cut -d':' -f2 | while read num; do
-          volume="registration-uploads-instance-$num"
+          volume="customer-a-uploads-instance-$num"
           
           if docker volume ls | grep -q "$volume"; then
             echo "✅ Volume already exists: $volume"
@@ -30,6 +32,6 @@ runs:
         done
         
         echo ""
-        echo "📊 All registration volumes:"
-        docker volume ls | grep registration-uploads || echo "No volumes found"
+        echo "📊 All customer-a volumes:"
+        docker volume ls | grep customer-a-uploads || echo "No volumes found"
         echo ""

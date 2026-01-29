@@ -1,5 +1,6 @@
 name: 'Deploy Instances'
-description: 'Deploys all registration containers with database connection'
+description: 'Deploys all customer-a containers with database connection from .env file'
+
 
 inputs:
   instances:
@@ -7,19 +8,24 @@ inputs:
     required: true
   db_host:
     description: 'Database host'
-    required: true
+    required: false
   db_port:
     description: 'Database port'
-    required: true
+    required: false
   db_name:
     description: 'Database name'
-    required: true
+    required: false
   db_user:
     description: 'Database user'
-    required: true
+    required: false
   db_password:
     description: 'Database password'
-    required: true
+    required: false
+  env_file_path:
+    description: 'Path to .env file on server'
+    required: false
+    default: ''
+
 
 runs:
   using: "composite"
@@ -33,8 +39,22 @@ runs:
         DB_NAME: ${{ inputs.db_name }}
         DB_USER: ${{ inputs.db_user }}
         DB_PASSWORD: ${{ inputs.db_password }}
+        ENV_FILE_PATH: ${{ inputs.env_file_path }}
       run: |
-        echo "🚀 Deploying all instances..."
+        echo "🚀 Deploying all customer-a instances..."
+        echo ""
+        
+        # Check if .env file exists
+        USE_ENV_FILE=false
+        if [ -n "$ENV_FILE_PATH" ] && [ -f "$ENV_FILE_PATH" ]; then
+          USE_ENV_FILE=true
+          echo "✅ Using .env file: $ENV_FILE_PATH"
+        elif [ -n "$DB_HOST" ]; then
+          echo "✅ Using GitHub secrets for database credentials"
+        else
+          echo "❌ No database configuration found (neither .env nor secrets)"
+          exit 1
+        fi
         echo ""
         
         COUNT=$(echo "$INSTANCES" | grep -o '"name"' | wc -l)
@@ -45,27 +65,44 @@ runs:
           NAME=$(echo "$INSTANCES" | grep -o '"name":"[^"]*"' | sed -n "${i}p" | cut -d'"' -f4)
           PORT=$(echo "$INSTANCES" | grep -o '"port":[0-9]*' | sed -n "${i}p" | cut -d':' -f2)
           NUM=$(echo "$INSTANCES" | grep -o '"num":[0-9]*' | sed -n "${i}p" | cut -d':' -f2)
-          VOLUME="registration-uploads-instance-$NUM"
+          VOLUME="customer-a-uploads-instance-$NUM"
           
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "Deploying: $NAME"
           echo "  Port: $PORT (host) → 8501 (container)"
           echo "  Volume: $VOLUME"
-          echo "  Database: $DB_HOST:$DB_PORT/$DB_NAME"
+          echo "  Network: customer-a-network"
+          if [ "$USE_ENV_FILE" = "true" ]; then
+            echo "  Database: Using .env file"
+          else
+            echo "  Database: $DB_HOST:$DB_PORT/$DB_NAME"
+          fi
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           
-          CONTAINER_ID=$(docker run -d \
-            -p $PORT:8501 \
-            --name $NAME \
-            --network app-network \
-            -v $VOLUME:/app/Frontend/uploads \
-            -e DB_HOST=$DB_HOST \
-            -e DB_PORT=$DB_PORT \
-            -e DB_NAME=$DB_NAME \
-            -e DB_USER=$DB_USER \
-            -e DB_PASSWORD=$DB_PASSWORD \
-            --restart unless-stopped \
-            registration-app:latest)
+          # Deploy container with or without .env file
+          if [ "$USE_ENV_FILE" = "true" ]; then
+            CONTAINER_ID=$(docker run -d \
+              -p $PORT:8501 \
+              --name $NAME \
+              --network customer-a-network \
+              -v $VOLUME:/app/Frontend/uploads \
+              --env-file $ENV_FILE_PATH \
+              --restart unless-stopped \
+              customer-a-app:latest)
+          else
+            CONTAINER_ID=$(docker run -d \
+              -p $PORT:8501 \
+              --name $NAME \
+              --network customer-a-network \
+              -v $VOLUME:/app/Frontend/uploads \
+              -e DB_HOST=$DB_HOST \
+              -e DB_PORT=$DB_PORT \
+              -e DB_NAME=$DB_NAME \
+              -e DB_USER=$DB_USER \
+              -e DB_PASSWORD=$DB_PASSWORD \
+              --restart unless-stopped \
+              customer-a-app:latest)
+          fi
           
           echo "Container ID: $CONTAINER_ID"
           echo "Waiting for container to start..."
@@ -92,11 +129,11 @@ runs:
         done
         
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "✅ Deployment complete v1 - $COUNT instances processed"
+        echo "✅ Deployment complete - $COUNT customer-a instances processed"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         echo "📊 Final status:"
-        docker ps --filter "name=registration-instance-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        docker ps --filter "name=customer-a-instance-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
         echo ""
         
         exit 0

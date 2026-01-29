@@ -1,12 +1,14 @@
-name: Deploy Registration App (Dynamic)
+name: Deploy Customer-A App
+
 
 on:
   push:
     branches:
-      - main
+      - customer-a
     paths:
       - 'Streamlit_app/**'
       - '.github/**'
+
 
 jobs:
   # ═══════════════════════════════════════════════════════════
@@ -14,7 +16,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════
   discover:
     name: 🔍 Discover Instances
-    runs-on: self-hosted
+    runs-on: internship-server
     outputs:
       instances: ${{ steps.discover.outputs.instances }}
     steps:
@@ -25,12 +27,13 @@ jobs:
         id: discover
         uses: ./.github/actions/discover-instances
 
+
   # ═══════════════════════════════════════════════════════════
   # JOB 2: CLEANUP - Stop and remove all containers
   # ═══════════════════════════════════════════════════════════
   cleanup:
     name: 🧹 Cleanup Containers
-    runs-on: self-hosted
+    runs-on: internship-server
     needs: discover
     steps:
       - name: Checkout code
@@ -41,12 +44,13 @@ jobs:
         with:
           instances: ${{ needs.discover.outputs.instances }}
 
+
   # ═══════════════════════════════════════════════════════════
   # JOB 3: TEST - Run validation tests
   # ═══════════════════════════════════════════════════════════
   test:
     name: 🧪 Run Tests
-    runs-on: self-hosted
+    runs-on: internship-server
     needs: cleanup
     steps:
       - name: Checkout code
@@ -56,12 +60,13 @@ jobs:
         working-directory: ./Streamlit_app
         run: python3 tests/test_validation.py
 
+
   # ═══════════════════════════════════════════════════════════
   # JOB 4: BUILD - Build Docker image
   # ═══════════════════════════════════════════════════════════
   build:
     name: 🔨 Build Image
-    runs-on: self-hosted
+    runs-on: internship-server
     needs: test
     steps:
       - name: Checkout code
@@ -70,16 +75,17 @@ jobs:
       - name: Build Docker image
         working-directory: ./Streamlit_app
         run: |
-          echo "🔨 Building Docker image..."
-          docker build -t registration-app:latest .
+          echo "🔨 Building Docker image for Customer A..."
+          docker build -t customer-a-app:latest .
           echo "✅ Build complete"
+
 
   # ═══════════════════════════════════════════════════════════
   # JOB 5: CREATE VOLUMES - Ensure volumes exist
   # ═══════════════════════════════════════════════════════════
   create-volumes:
     name: 📦 Create Volumes
-    runs-on: self-hosted
+    runs-on: internship-server
     needs: [discover, build]
     steps:
       - name: Checkout code
@@ -90,12 +96,13 @@ jobs:
         with:
           instances: ${{ needs.discover.outputs.instances }}
 
+
   # ═══════════════════════════════════════════════════════════
   # JOB 6: DEPLOY - Deploy all containers
   # ═══════════════════════════════════════════════════════════
   deploy:
     name: 🚀 Deploy Instances
-    runs-on: self-hosted
+    runs-on: internship-server
     needs: [discover, create-volumes]
     steps:
       - name: Checkout code
@@ -105,18 +112,15 @@ jobs:
         uses: ./.github/actions/deploy-instance
         with:
           instances: ${{ needs.discover.outputs.instances }}
-          db_host: ${{ secrets.DB_HOST }}
-          db_port: ${{ secrets.DB_PORT }}
-          db_name: ${{ secrets.DB_NAME }}
-          db_user: ${{ secrets.DB_USER }}
-          db_password: ${{ secrets.DB_PASSWORD }}
+          env_file_path: '/opt/customer-a/.env'
+
 
   # ═══════════════════════════════════════════════════════════
   # JOB 7: HEALTH CHECK - Verify all instances are running
   # ═══════════════════════════════════════════════════════════
   health-check:
     name: 🏥 Health Check
-    runs-on: self-hosted
+    runs-on: internship-server
     needs: [discover, deploy]
     steps:
       - name: Checkout code
@@ -127,24 +131,25 @@ jobs:
         with:
           instances: ${{ needs.discover.outputs.instances }}
 
+
   # ═══════════════════════════════════════════════════════════
   # JOB 8: SUMMARY - Show deployment summary
   # ═══════════════════════════════════════════════════════════
   summary:
     name: 📊 Deployment Summary
-    runs-on: self-hosted
+    runs-on: internship-server
     needs: [discover, health-check]
     steps:
       - name: Display summary
         run: |
           echo "════════════════════════════════════════════════════"
-          echo "✅ DEPLOYMENT COMPLETE"
+          echo "✅ CUSTOMER-A DEPLOYMENT COMPLETE"
           echo "════════════════════════════════════════════════════"
           echo ""
           echo "Deployed instances:"
           echo '${{ needs.discover.outputs.instances }}' | jq -r '.[] | "  • \(.name) on port \(.port)"'
           echo ""
           echo "Access your applications:"
-          echo '${{ needs.discover.outputs.instances }}' | jq -r '.[] | "  http://207.180.253.183:\(.port)"'
+          echo '${{ needs.discover.outputs.instances }}' | jq -r '.[] | "  http://5.189.158.212:\(.port)"'
           echo ""
           echo "════════════════════════════════════════════════════"

@@ -1,10 +1,12 @@
 name: 'Health Check'
-description: 'Verifies all instances are running and responding'
+description: 'Verifies all customer-a instances are running and responding'
+
 
 inputs:
   instances:
     description: 'JSON array of instances to check'
     required: true
+
 
 runs:
   using: "composite"
@@ -14,7 +16,7 @@ runs:
       env:
         INSTANCES: ${{ inputs.instances }}
       run: |
-        echo "🏥 Running health checks on all instances..."
+        echo "🏥 Running health checks on all customer-a instances..."
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         
@@ -63,4 +65,4 @@ runs:
         fi
         
         echo ""
-        echo "✅ All instances are healthy!"
+        echo "✅ All customer-a instances are healthy!"

@@ -1,10 +1,12 @@
 name: 'Cleanup Containers'
-description: 'Stops and removes all registration containers'
+description: 'Stops and removes all customer-a containers'
+
 
 inputs:
   instances:
     description: 'JSON array of instances'
     required: true
+
 
 runs:
   using: "composite"
@@ -12,10 +14,10 @@ runs:
     - name: Cleanup all containers
       shell: bash
       run: |
-        echo "🧹 Starting cleanup of all registration containers..."
+        echo "🧹 Starting cleanup of all customer-a containers..."
         echo ""
         
-        CONTAINERS=$(docker ps -a --filter "name=registration-instance-" --format "{{.Names}}")
+        CONTAINERS=$(docker ps -a --filter "name=customer-a-instance-" --format "{{.Names}}")
         
         if [ -z "$CONTAINERS" ]; then
           echo "✅ No containers to cleanup. Clean slate!"
@@ -40,7 +42,7 @@ runs:
         
         echo ""
         echo "🔍 Checking port availability..."
-        for port in 8501 8502 8503 8504 8505 8506 8507 8508 8509 8510; do
+        for port in 8601 8602 8603 8604 8605; do
           if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
             echo "⚠️  Port $port is in use"
           else
